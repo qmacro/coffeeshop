@@ -1,0 +1,16 @@
+<html>
+  {% include 'head_incl.html' %}
+  <body>
+    {% include 'title_incl.html' %}
+    {% include 'channel_incl.html' %}
+    <p>Created: {{ channel.created }}</p>
+    <p>
+    {% if anysubscribers %}
+      <a href='subscriber/'>Subscribers</a>
+    {% else %}
+      No subscribers.
+    {% endif %}
+    </p>
+    <p><a href='subscriber/submissionform'>Add a subscriber</a></p>
+  </body>
+</html>

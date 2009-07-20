@@ -1,0 +1,13 @@
+<html>
+  {% include 'head_incl.html' %}
+  <body>
+    {% include 'title_incl.html' %}
+    <h2>Add a channel</h2>
+    <form action="/channel/" method="POST">
+      <input type="hidden" name="channelsubmissionform" value="1" />
+      <div><label>Name:<input type="text" name="name" /></label></div>
+      <div><input type="submit" value="Submit"/></div>
+    </form>
+
+  </body>
+</html>

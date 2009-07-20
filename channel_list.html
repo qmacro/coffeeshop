@@ -1,0 +1,11 @@
+<html>
+  {% include 'head_incl.html' %}
+  <body>
+    {% include 'title_incl.html' %}
+    <h2>Channels</h2>
+    <p><a href='submissionform'>Add a channel</a></p>
+    {% for channel in channels %}
+      {% include 'channeldetail_incl.html' %}
+    {% endfor %}
+  </body>
+</html>

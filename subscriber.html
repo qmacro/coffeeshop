@@ -1,0 +1,15 @@
+<html>
+  {% include 'head_incl.html' %}
+  <body>
+    {% include 'title_incl.html' %}
+    {% include 'channel_incl.html' %}
+    <h3>Subscribers</h3>
+    {% if subscribers %}
+      {% for subscriber in subscribers %}
+        {% include 'subscriberdetail_incl.html' %}
+      {% endfor %}
+    {% else %}
+      No subscribers yet. <a href='submissionform'>Add one</a>.
+    {% endif %}
+  </body>
+</html>

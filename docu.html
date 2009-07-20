@@ -1,0 +1,123 @@
+<html>
+  <head>
+    <title>coffeeshop</title>
+  </head>
+  <body>
+    <h1><a href='/'>coffeeshop</a></h1>
+
+<table border='1'>
+<tr>
+<th width='30%'>Resource</th>
+<th>Verb</th>
+<th>Payload</th>
+<th>Result</th>
+<th>Description</th>
+<th>Impl. in Version</th>
+</tr>
+
+<tr>
+<td><a href='/'>/</a></td>
+<td>GET</td>
+<td>none</td>
+<td>200 with application index page</td>
+<td>Application home</td>
+<td>0.01</td>
+</tr>
+
+
+<tr>
+<td><a href='/channel/'>/channel/</a></td>
+<td>GET</td>
+<td>none</td>
+<td>200 with list of channels</td>
+<td>List existing channels</td>
+<td>0.01</td>
+</tr>
+
+<tr>
+<td>/channel/</td>
+<td>POST</td>
+<td>name=channelname</td>
+<td>201 with location of new channel resource (/channel/{cid}/)</td>
+<td>Create a new channel</td>
+<td>0.01</td>
+</tr>
+
+<tr>
+<td><a href='/channel/submissionform'>/channel/submissionform</a></td>
+<td>GET</td>
+<td>none</td>
+<td>200 with form</td>
+<td>New channel submission form (for use in browsers)</td>
+<td>0.01</td>
+</tr>
+
+<tr>
+<td>/channel/{cid}/</td>
+<td>GET</td>
+<td>none</td>
+<td>200 with details of channel</td>
+<td>Details of channel with id of {cid}</td>
+<td>0.01</td>
+</tr>
+
+<tr>
+<td>/channel/{cid}/</td>
+<td>DELETE</td>
+<td>none</td>
+<td>204 with no content (or 302 with location set to /channel/ resource if in a browser)</td>
+<td>Delete channel with id of {cid}</td>
+<td>-</td>
+</tr>
+
+<tr>
+<td>/channel/{sid}/subscriber/</td>
+<td>GET</td>
+<td>none</td>
+<td>200 with list of channel subscribers</td>
+<td>List of subscribers for channel with id of {cid}</td>
+<td>0.01</td>
+</tr>
+
+<tr>
+<td>/channel/{cid}/subscriber/</td>
+<td>POST</td>
+<td>name=subscribername, resource=url</td>
+<td>201 with location of new channel subscriber resource (/channel/{cid}/subscriber/{sid}/)</td>
+<td>Create a new subscriber for channel with id of {cid}</td>
+<td>0.01</td>
+</tr>
+
+<tr>
+<td>/channel/{cid}/subscriber/{sid}/</td>
+<td>GET</td>
+<td>none</td>
+<td>200 with details of subscriber</td>
+<td>Details of subscriber with id of {sid} for channel with id of {cid}</td>
+<td>0.01</td>
+</tr>
+
+<tr>
+<td>/channel/{cid}/subscriber/{sid}/</td>
+<td>DELETE</td>
+<td>none</td>
+<td>204 with no content (or 302 with location set to /channel/{cid}/subscriber/ resource if in a browser)</td>
+<td>Delete subscriber with id of {sid} for channel with id of {cid}</td>
+<td>-</td>
+</tr>
+
+<tr>
+<td>/channel/{cid}/subscriber/submissionform</td>
+<td>GET</td>
+<td>none</td>
+<td>200 with form</td>
+<td>New subscriber submission form for channel with id of {cid} (for use with browsers)</td>
+<td>0.01</td>
+</tr>
+
+</table>
+
+<p>(c) 2009 <a href='http://www.pipetree.com/qmacro/'>DJ Adams</a></p>
+
+  </body>
+</html>

@@ -1,0 +1,14 @@
+<html>
+  {% include 'head_incl.html' %}
+  <body>
+    {% include 'title_incl.html' %}
+    {% include 'channel_incl.html' %}
+    <p>Add a subscriber for channel {{ channel.key.id }}</p>
+    <form action="/channel/{{ channel.key.id }}/subscriber/" method="POST">
+      <input type="hidden" name="subscribersubmissionform" value="1" />
+      <div><label>Name:<input type="text" name="name" /></label></div>
+      <div><label>Resource:<input type="text" name="resource" /></label></div>
+      <div><input type="submit" value="Submit"/></div>
+    </form>
+  </body>
+</html>
