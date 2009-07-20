@@ -1,13 +1,19 @@
+# coffeeshop
+# An implementation of a REST-orientated publish/subscribe mechanism
+# (c) 2009 DJ Adams
+# See https://github.com/qmacro/coffeeshop/
+
 import os
 import re
 import cgi
 import logging
 import wsgiref.handlers
+import datetime
 
 from models import Channel, Subscriber
+from bucket import agoify
 
 from google.appengine.ext.webapp import template
-#from google.appengine.api import users
 from google.appengine.ext import webapp
 from google.appengine.ext import db
 
@@ -34,6 +40,7 @@ class ChannelContainerHandler(webapp.RequestHandler):
         'channelid': channel.key().id(),
         'name': channel.name,
         'created': channel.created,
+        'created_ago': agoify(channel.created),
       })
     template_values = {
       'channels': channels,
@@ -48,7 +55,6 @@ class ChannelContainerHandler(webapp.RequestHandler):
     """
     channel = Channel()
     name = self.request.get('name').rstrip('\n')
-    logging.info("submitted channel: %s" % (name, ))
     channel.name = name
     channel.put()
 #   Not sure I like this ... re-put()ing
@@ -89,7 +95,6 @@ class ChannelHandler(webapp.RequestHandler):
     channel = Channel.get_by_id(int(channelid))
     anysubscribers = Subscriber.all().filter('channel =', channel).fetch(1)
     
-    logging.info(anysubscribers)
     template_values = {
       'channel': channel,
       'anysubscribers': anysubscribers,
@@ -107,7 +112,6 @@ class ChannelSubscriberSubmissionformHandler(webapp.RequestHandler):
   def get(self, channelid):
     """Handles a GET to the /channel/{id}/subscriber/submissionform resource
     """
-    logging.info("ChannelSubscriberSubmissionformHandler GET")
     channel = Channel.get_by_id(int(channelid))
     if channel is None:
       self.response.out.write("Channel %s not found" % (channelid, ))
@@ -139,7 +143,6 @@ class ChannelSubscriberContainerHandler(webapp.RequestHandler):
 
     subscribers = []
     for subscriber in Subscriber.all().filter('channel =', channel):
-      logging.info(subscriber.key().id())
       subscribers.append({
         'subscriberid': subscriber.key().id(),
         'name': subscriber.name,
@@ -177,7 +180,6 @@ class ChannelSubscriberContainerHandler(webapp.RequestHandler):
 #   If we've got here from a web form, redirect the user to the 
 #   channel subscriber resource, otherwise return the 201
     if self.request.get('subscribersubmissionform'):
-      logging.info("rediercting to %s" % (self.request.path_info, ))
       self.redirect(self.request.path_info)
     else:
       self.response.headers['Location'] = '/channel/' + channelid + '/subscriber/' + str(subscriber.key().id()) + '/'
