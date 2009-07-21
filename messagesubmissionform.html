@@ -1,0 +1,13 @@
+<html>
+  {% include 'head_incl.html' %}
+  <body>
+    {% include 'title_incl.html' %}
+    {% include 'channel_incl.html' %}
+    <h2>Publish a test message</h2>
+    <form action="/channel/{{ channel.key.id }}/" method="POST">
+      <input type="hidden" name="messagesubmissionform" value="1" />
+      <div><label>Message:<input type="text" name="message" /></label></div>
+      <div><input type="submit" value="Submit"/></div>
+    </form>
+  </body>
+</html>

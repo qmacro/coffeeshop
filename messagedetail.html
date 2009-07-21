@@ -1,0 +1,26 @@
+<html>
+  {% include 'head_incl.html' %}
+  <body>
+    {% include 'title_incl.html' %}
+    <h2>Message Detail</h2>
+    <p>Message {{ message.key }}</p>
+    <p>Created {{ message.created }}</p>
+    <p>Channel <a href='/channel/{{ message.channel.key.id }}/'>{{ message.channel.name }}</a></p>
+    <p>Content-Type {{ message.contenttype }}</p>
+    <h3>Delivery</h3>
+    <table border='1'>
+    <tr>
+      <th>Recipient</th>
+      <th>Status</th>
+      <th>Timestamp</th>
+    </tr>
+    {% for delivery in deliveries %}
+      <tr>
+        <td><a href='/channel/{{ message.channel.key.id }}/subscriber/{{ delivery.recipient.key.id }}/'>{{ delivery.recipient.name }}</a></td>
+        <td>{{ delivery.status }}</td>
+        <td>{{ delivery.updated }}</td>
+      </tr>
+    {% endfor %}
+    </table>
+  </body>
+</html>

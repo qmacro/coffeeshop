@@ -1,5 +1,5 @@
 # coffeeshop
-# An implementation of a REST-orientated publish/subscribe mechanism
+# A lightweight REST-orientated pubsub mechanism
 # (c) 2009 DJ Adams
 # See https://github.com/qmacro/coffeeshop/
 
@@ -10,18 +10,24 @@ import logging
 import wsgiref.handlers
 import datetime
 
-from models import Channel, Subscriber
+from models import Channel, Subscriber, Message, Delivery
 from bucket import agoify
 
 from google.appengine.ext.webapp import template
 from google.appengine.ext import webapp
 from google.appengine.ext import db
+from google.appengine.api.labs import taskqueue
+
+VERSION = "0.01"
 
 #     ***************
 class MainPageHandler(webapp.RequestHandler):
 #     ***************
   def get(self):
-    template_values = {}
+    template_values = {
+      'version': VERSION,
+      'server_software': os.environ.get("SERVER_SOFTWARE", "unknown"),
+    }
     path = os.path.join(os.path.dirname(__file__), 'index.html')
     self.response.out.write(template.render(path, template_values))
 
@@ -67,7 +73,7 @@ class ChannelContainerHandler(webapp.RequestHandler):
     if self.request.get('channelsubmissionform'):
       self.redirect('/channel/')
     else:
-      self.response.headers['Location'] = '/channel/' + str(channel.key().id())
+      self.response.headers['Location'] = '/channel/' + str(channel.key().id()) + '/'
       self.response.set_status(201)
 
 
@@ -90,9 +96,20 @@ class ChannelHandler(webapp.RequestHandler):
 #     **************
   """Handles an individual channel resource
   e.g. /channel/123/
+  Shows when it was created, and a link to subscribers (if there are any)
   """
-  def get(self, channelid):
+  def _getchannel(self, channelid):
+    # TODO refactor this into a base class
     channel = Channel.get_by_id(int(channelid))
+    if channel is None:
+      self.response.out.write("Channel %s not found" % (channelid, ))
+      self.response.set_status(404)
+    return channel
+    
+  def get(self, channelid):
+    channel = self._getchannel(channelid)
+    if channel is None: return
+
     anysubscribers = Subscriber.all().filter('channel =', channel).fetch(1)
     
     template_values = {
@@ -101,6 +118,32 @@ class ChannelHandler(webapp.RequestHandler):
     }
     path = os.path.join(os.path.dirname(__file__), 'channel_detail.html')
     self.response.out.write(template.render(path, template_values))
+
+
+  def post(self, channelid):
+    channel = self._getchannel(channelid)
+    if channel is None: return
+
+    # Save message
+    message = Message(
+      contenttype = self.request.headers['Content-Type'],
+      body = self.request.body,
+      channel = channel,
+    )
+    message.put()
+
+    for subscriber in Subscriber.all().filter('channel =', channel):
+      logging.info(subscriber.name)
+
+      # Set up delivery of message to subscriber
+      delivery = Delivery(
+        message = message,
+        recipient = subscriber,
+      )
+      delivery.put()
+
+    # TODO should we return a 202 instead of a 302?
+    self.redirect(self.request.url + 'message/' + str(message.key()))
 
 
 #     **************************************
@@ -154,7 +197,7 @@ class ChannelSubscriberContainerHandler(webapp.RequestHandler):
       'channel': channel,
       'subscribers': subscribers,
     }
-    path = os.path.join(os.path.dirname(__file__), 'subscriber.html')
+    path = os.path.join(os.path.dirname(__file__), 'channelsubscriber.html')
     self.response.out.write(template.render(path, template_values))
 
   def post(self, channelid):
@@ -176,6 +219,10 @@ class ChannelSubscriberContainerHandler(webapp.RequestHandler):
     subscriber.name = name
     subscriber.resource = resource
     subscriber.put()
+#   Not sure I like this ... re-put()ing
+    if len(subscriber.name) == 0:
+      subscriber.name = 'subscriber-' + str(subscriber.key().id())
+      subscriber.put()
 
 #   If we've got here from a web form, redirect the user to the 
 #   channel subscriber resource, otherwise return the 201
@@ -193,8 +240,6 @@ class ChannelSubscriberHandler(webapp.RequestHandler):
   /channel/{id}/subscriber/{id}/
   """
   def get(self, channelid, subscriberid):
-    """Handles a GET to the /channel/{id}/subscriber/{id}/ resource
-    """
     channel = Channel.get_by_id(int(channelid))
     if channel is None:
       self.response.out.write("Channel %s not found" % (channelid, ))
@@ -215,6 +260,97 @@ class ChannelSubscriberHandler(webapp.RequestHandler):
     self.response.out.write(template.render(path, template_values))
 
 
+#     **************************
+class SubscriberContainerHandler(webapp.RequestHandler):
+#     **************************
+  """Handles the subscriber container resource, i.e.
+  /subscriber/
+  GET will just return a list of subscribers, by channel
+  """
+  def get(self):
+    subscribers = db.GqlQuery("SELECT * FROM Subscriber "
+                                  "ORDER BY channel ASC, created DESC")
+    template_values = {
+      'subscribers': subscribers,
+    }
+    path = os.path.join(os.path.dirname(__file__), 'subscriber.html')
+    self.response.out.write(template.render(path, template_values))
+    
+
+class ChannelMessageHandler(webapp.RequestHandler):
+  """Handles message delivery status resources in the form of
+  /channel/{cid}/message/{mid}
+  """
+  def get(self, channelid, messageid):
+    message = Message.get(messageid)
+    if message is None:
+      self.response.out.write("Message %s not found" % (messageid, ))
+      self.response.set_status(404)
+      return
+
+    template_values = {
+      'message': message,
+      'deliveries': Delivery.all().filter('message =', message),
+    }
+    path = os.path.join(os.path.dirname(__file__), 'messagedetail.html')
+    self.response.out.write(template.render(path, template_values))
+    self.response.set_status(200)
+
+
+class ChannelMessageContainerHandler(webapp.RequestHandler):
+  """Handles the message container resource for a channel, in the form of
+  /channel/{cid}/message/
+  """
+  def _getchannel(self, channelid):
+    # TODO refactor this into a base class
+    channel = Channel.get_by_id(int(channelid))
+    if channel is None:
+      self.response.out.write("Channel %s not found" % (channelid, ))
+      self.response.set_status(404)
+    return channel
+    
+  def get(self, channelid):
+    channel = self._getchannel(channelid)
+    if channel is None: return
+
+    template_values = {
+      'channel': channel,
+      'messages': Message.all().filter('channel =', channel),
+    }
+    path = os.path.join(os.path.dirname(__file__), 'messagelist.html')
+    self.response.out.write(template.render(path, template_values))
+    self.response.set_status(200)
+
+
+class ChannelMessageSubmissionformHandler(webapp.RequestHandler):
+  """Handles the channel message submission form for a given channel,
+  i.e. resource /channel/{id}/message/submissionform
+  """
+  def _getchannel(self, channelid):
+    # TODO refactor this into a base class
+    channel = Channel.get_by_id(int(channelid))
+    if channel is None:
+      self.response.out.write("Channel %s not found" % (channelid, ))
+      self.response.set_status(404)
+    return channel
+    
+  def get(self, channelid):
+    channel = self._getchannel(channelid)
+    if channel is None: return
+
+    template_values = {
+      'channel': channel,
+    }
+    path = os.path.join(os.path.dirname(__file__), 'messagesubmissionform.html')
+    self.response.out.write(template.render(path, template_values))
+
+
+
+#class ReflectHandler(webapp.RequestHandler):
+#  """Task Queue handler - accepts a URL and a payload entity and
+#  makes a POST request
+#  """
+#  def post(self,
 
 def main():
   application = webapp.WSGIApplication([
@@ -223,8 +359,13 @@ def main():
     (r'/channel/(.+?)/subscriber/submissionform', ChannelSubscriberSubmissionformHandler),
     (r'/channel/(.+?)/subscriber/', ChannelSubscriberContainerHandler),
     (r'/channel/(.+?)/subscriber/(.+?)/', ChannelSubscriberHandler),
-    (r'/channel/(.+?)/?', ChannelHandler),
+    (r'/channel/(.+?)/message/submissionform/?', ChannelMessageSubmissionformHandler),
+    (r'/channel/(.+?)/message/(.+)', ChannelMessageHandler),
+    (r'/channel/(.+?)/message/', ChannelMessageContainerHandler),
+    (r'/channel/(.+?)/', ChannelHandler),
     (r'/channel/?', ChannelContainerHandler),
+    (r'/subscriber/', SubscriberContainerHandler),
+#   (r'/reflect/', ReflectHandler),
   ], debug=True)
   wsgiref.handlers.CGIHandler().run(application)
 

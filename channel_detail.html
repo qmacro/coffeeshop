@@ -4,13 +4,14 @@
     {% include 'title_incl.html' %}
     {% include 'channel_incl.html' %}
     <p>Created: {{ channel.created }}</p>
+    <p><a href='message/'>Messages</a> / <a href='message/submissionform'>Publish a test message</a></p>
     <p>
     {% if anysubscribers %}
-      <a href='subscriber/'>Subscribers</a>
+      <a href='subscriber/'>Subscribers</a> / 
     {% else %}
       No subscribers.
     {% endif %}
+    <a href='subscriber/submissionform'>Add a subscriber</a>
     </p>
-    <p><a href='subscriber/submissionform'>Add a subscriber</a></p>
   </body>
 </html>

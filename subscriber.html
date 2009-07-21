@@ -2,14 +2,19 @@
   {% include 'head_incl.html' %}
   <body>
     {% include 'title_incl.html' %}
-    {% include 'channel_incl.html' %}
-    <h3>Subscribers</h3>
-    {% if subscribers %}
-      {% for subscriber in subscribers %}
-        {% include 'subscriberdetail_incl.html' %}
-      {% endfor %}
-    {% else %}
-      No subscribers yet. <a href='submissionform'>Add one</a>.
-    {% endif %}
+    <h2>Subscribers</h2>
+    <table border='1'>
+    <tr>
+      <th>Subscriber</th>
+      <th>Resource</th>
+      <th>Channel</th>
+    </tr>
+    {% for subscriber in subscribers %}
+      <tr>
+        <td><a href='/channel/{{ subscriber.channel.key.id }}/subscriber/{{ subscriber.key.id }}/'>{{ subscriber.name }}</a></td>
+        <td><a href='{{ subscriber.resource }}/'>{{ subscriber.resource }}</a></td>
+        <td><a href='/channel/{{ subscriber.channel.key.id }}/'>{{ subscriber.channel.name }}</a></td>
+      </tr>
+    {% endfor %}
   </body>
 </html>
