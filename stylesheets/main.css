@@ -1,5 +1,10 @@
 body {
   background-color: #ffffff;
+  font-family: monospace;
+}
+
+table {
+  border-spacing: 5px;
 }
 
 .created {

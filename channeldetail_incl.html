@@ -1,7 +1,5 @@
-<div id="channeldetail">
-<a href='{{ channel.channelid }}/'>{{ channel.channelid }}</a>
-{% if channel.name %}
-  "{{ channel.name }}"
-{% endif %}
-<span class="created">created {{ channel.created_ago }}</span>
-</div>
+<tr>
+  <td><a href='{{ channel.channelid }}/'>{{ channel.name }}</a></td>
+  <td>{{ channel.created_ago }}</td>
+</tr>
+
