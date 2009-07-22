@@ -1,6 +1,4 @@
-<div id="subscriberdetail">
-<a href='{{ subscriber.subscriberid }}/'>{{ subscriber.subscriberid }}</a>
-{% if subscriber.name %}
-  "{{ subscriber.name }}"
-{% endif %}
-</div>
+<tr>
+  <td><a href='{{ subscriber.subscriberid }}/'>{{ subscriber.name }}</a></td>
+  <td><a href='{{ subscriber.resource }}'>{{ subscriber.resource }}</a></td>
+</tr>

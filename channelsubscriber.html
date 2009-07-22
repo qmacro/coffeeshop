@@ -5,9 +5,15 @@
     {% include 'channel_incl.html' %}
     <h3>Subscribers</h3>
     {% if subscribers %}
+      <table>
+      <tr>
+        <th>Subscriber</th>
+        <th>Resource</th>
+      </tr>
       {% for subscriber in subscribers %}
         {% include 'subscriberdetail_incl.html' %}
       {% endfor %}
+      </table>
     {% else %}
       No subscribers yet. <a href='submissionform'>Add one</a>.
     {% endif %}

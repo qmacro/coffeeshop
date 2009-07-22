@@ -23,12 +23,17 @@ from google.appengine.api import urlfetch
 VERSION = "0.01"
 DEBUG = True
 
+# Name of task queue for message distribution
+QUEUE_DISTRIBUTION='msgdist'
+
+# Statuses
+STATUS_DELIVERED='DELIVERED'
+
 if DEBUG:
   logging.info("Setting debug level to %s" % (logging.DEBUG, ))
   logging.getLogger().setLevel(logging.DEBUG)
 
 
-# TODO: use a few constants, e.g. for 'Delivered'
 
 #     ***************
 class MainPageHandler(webapp.RequestHandler):
@@ -153,7 +158,9 @@ class ChannelHandler(webapp.RequestHandler):
       delivery.put()
 
     # Kick off a task to distribute message
-    taskqueue.add(url='/distributor/' + str(message.key()))
+    taskqueue.Task(
+      url='/distributor/' + str(message.key())
+    ).add(QUEUE_DISTRIBUTION)
 
     # TODO should we return a 202 instead of a 302?
     self.redirect(self.request.url + 'message/' + str(message.key()))
@@ -370,7 +377,7 @@ class MessageHandler(webapp.RequestHandler):
     messages = []
     for message in db.GqlQuery("SELECT * FROM Message ORDER BY channel ASC, created DESC"):
       recipients = Delivery.all().filter('message =', message).count()
-      delivered = Delivery.all().filter('message =', message).filter('status =', 'Delivered').count()
+      delivered = Delivery.all().filter('message =', message).filter('status =', STATUS_DELIVERED).count()
       messages.append({
         'message': message,
         'recipients': recipients,
@@ -416,7 +423,7 @@ class DistributeWorker(webapp.RequestHandler):
       # particular delivery done. Otherwise, mark the delivery
       # as failed.
       if result.status_code < 400:
-        delivery.status = 'Delivered'
+        delivery.status = STATUS_DELIVERED
         delivery.put()
       else:
         deliveriessucceeded = False
