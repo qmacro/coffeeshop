@@ -1,0 +1,24 @@
+<html>
+  {% include 'head_incl.html' %}
+  <body>
+    {% include 'title_incl.html' %}
+    <h2>Messages</h2>
+    <table>
+    <tr>
+      <th>Message</th>
+      <th>Created</th>
+      <th>Recipients</th>
+      <th>Delivered</th>
+      <th>Channel</th>
+    </tr>
+    {% for m in messages %}
+      <tr align='center'>
+        <td><a href='/channel/{{ m.message.channel.key.id }}/message/{{ m.message.key }}'>{{ m.message.key }}</a></td>
+        <td>{{ m.message.created }}</a></td>
+        <td>{{ m.recipients }}</td>
+        <td>{{ m.delivered }}</td>
+        <td><a href='/channel/{{ m.message.channel.key.id }}/'>{{ m.message.channel.name }}</a></td>
+      </tr>
+    {% endfor %}
+  </body>
+</html>

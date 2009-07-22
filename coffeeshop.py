@@ -9,6 +9,7 @@ import cgi
 import logging
 import wsgiref.handlers
 import datetime
+import urllib2
 
 from models import Channel, Subscriber, Message, Delivery
 from bucket import agoify
@@ -17,8 +18,17 @@ from google.appengine.ext.webapp import template
 from google.appengine.ext import webapp
 from google.appengine.ext import db
 from google.appengine.api.labs import taskqueue
+from google.appengine.api import urlfetch
 
 VERSION = "0.01"
+DEBUG = True
+
+if DEBUG:
+  logging.info("Setting debug level to %s" % (logging.DEBUG, ))
+  logging.getLogger().setLevel(logging.DEBUG)
+
+
+# TODO: use a few constants, e.g. for 'Delivered'
 
 #     ***************
 class MainPageHandler(webapp.RequestHandler):
@@ -120,6 +130,7 @@ class ChannelHandler(webapp.RequestHandler):
     self.response.out.write(template.render(path, template_values))
 
 
+  # The publish bit!
   def post(self, channelid):
     channel = self._getchannel(channelid)
     if channel is None: return
@@ -133,7 +144,6 @@ class ChannelHandler(webapp.RequestHandler):
     message.put()
 
     for subscriber in Subscriber.all().filter('channel =', channel):
-      logging.info(subscriber.name)
 
       # Set up delivery of message to subscriber
       delivery = Delivery(
@@ -141,6 +151,9 @@ class ChannelHandler(webapp.RequestHandler):
         recipient = subscriber,
       )
       delivery.put()
+
+    # Kick off a task to distribute message
+    taskqueue.add(url='/distributor/' + str(message.key()))
 
     # TODO should we return a 202 instead of a 302?
     self.redirect(self.request.url + 'message/' + str(message.key()))
@@ -345,12 +358,74 @@ class ChannelMessageSubmissionformHandler(webapp.RequestHandler):
     self.response.out.write(template.render(path, template_values))
 
 
+class MessageHandler(webapp.RequestHandler):
+  """Handles the message overview resource, i.e.
+  /message/
+  GET will just return a list of messages, by channel
+  Not sure whether this resource will cause confusion where you'd think
+  you can POST to this resource (which you can't, of course).
+  """
+  def get(self):
+    # This seems expensive. TODO: refactor
+    messages = []
+    for message in db.GqlQuery("SELECT * FROM Message ORDER BY channel ASC, created DESC"):
+      recipients = Delivery.all().filter('message =', message).count()
+      delivered = Delivery.all().filter('message =', message).filter('status =', 'Delivered').count()
+      messages.append({
+        'message': message,
+        'recipients': recipients,
+        'delivered': delivered,
+      })
+    template_values = {
+      'messages': messages,
+    }
+    path = os.path.join(os.path.dirname(__file__), 'message.html')
+    self.response.out.write(template.render(path, template_values))
+    
 
-#class ReflectHandler(webapp.RequestHandler):
-#  """Task Queue handler - accepts a URL and a payload entity and
-#  makes a POST request
-#  """
-#  def post(self,
+
+class DistributeWorker(webapp.RequestHandler):
+  """Task Queue worker - distributes a given message. The task queue 
+  mechanism may retry this if not all the deliveries have been made.
+  It should keep retrying until they all have been made.
+  """
+  def post(self, messageid):
+    # Retrieve the message, make sure it exists
+    message = Message.get(messageid)
+    if message is None: self.request.set_status(404)
+
+    # Assume all deliveries are successful (i.e. this task is done)
+    deliveriessucceeded = True
+
+    # For this message, process those deliveries that have not yet been
+    # delivered (status will be None)
+    for delivery in Delivery.all().filter('message =', message).filter('status =', None):
+      logging.info("Processing delivery %s" % (delivery.key(), ))
+
+      # Make the delivery with a POST to the recipient's resource
+      # sending the published body, with the published body's content-type
+      result = urlfetch.fetch(
+        url = delivery.recipient.resource,
+        payload = message.body,
+        method = urlfetch.POST,
+        headers = { 'Content-Type': message.contenttype },
+      )
+      logging.info("Result is %s" % (result.status_code, ))
+
+      # If we've had a successful status then consider this 
+      # particular delivery done. Otherwise, mark the delivery
+      # as failed.
+      if result.status_code < 400:
+        delivery.status = 'Delivered'
+        delivery.put()
+      else:
+        deliveriessucceeded = False
+
+    # If there are failed deliveries, mark this task as failed
+    # so that the task queue mechanism will retry.
+    if not deliveriessucceeded:
+      self.response.set_status(500)
+
 
 def main():
   application = webapp.WSGIApplication([
@@ -365,7 +440,8 @@ def main():
     (r'/channel/(.+?)/', ChannelHandler),
     (r'/channel/?', ChannelContainerHandler),
     (r'/subscriber/', SubscriberContainerHandler),
-#   (r'/reflect/', ReflectHandler),
+    (r'/message/', MessageHandler),
+    (r'/distributor/(.+?)', DistributeWorker),
   ], debug=True)
   wsgiref.handlers.CGIHandler().run(application)
 
