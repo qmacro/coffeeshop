@@ -9,7 +9,7 @@ import cgi
 import logging
 import wsgiref.handlers
 import datetime
-import urllib2
+#import urllib2
 
 from models import Channel, Subscriber, Message, Delivery
 from bucket import agoify
@@ -30,14 +30,37 @@ QUEUE_DISTRIBUTION='msgdist'
 STATUS_DELIVERED='DELIVERED'
 
 if DEBUG:
-  logging.info("Setting debug level to %s" % (logging.DEBUG, ))
   logging.getLogger().setLevel(logging.DEBUG)
 
 
+def isNumber(n):
+  try:
+    int(n); return True
+  except ValueError:
+    pass
 
-#     ***************
+
+class EntityRequestHandler(webapp.RequestHandler):
+  def _getentity(self, type, id):
+    entity = None
+
+    # id must be numeric
+    if not isNumber(id):
+      self.response.out.write("%s must be numeric (got %s)" % (type.__name__, id))
+      self.response.set_status(404)
+      return
+
+    entity = type.get_by_id(int(id))
+    if entity is None:
+      self.response.out.write("%s %s not found" % (type.__name__, id))
+      self.response.set_status(404)
+      return
+
+    return entity
+
+
+
 class MainPageHandler(webapp.RequestHandler):
-#     ***************
   def get(self):
     template_values = {
       'version': VERSION,
@@ -46,9 +69,7 @@ class MainPageHandler(webapp.RequestHandler):
     path = os.path.join(os.path.dirname(__file__), 'index.html')
     self.response.out.write(template.render(path, template_values))
 
-#     ***********************
 class ChannelContainerHandler(webapp.RequestHandler):
-#     ***********************
   """Handler for main /channel/ resource
   """
   def get(self):
@@ -92,9 +113,7 @@ class ChannelContainerHandler(webapp.RequestHandler):
       self.response.set_status(201)
 
 
-#     ****************************
 class ChannelSubmissionformHandler(webapp.RequestHandler):
-#     ****************************
   """Handles the channel submission form resource
   /channel/submissionform/
   """
@@ -106,23 +125,13 @@ class ChannelSubmissionformHandler(webapp.RequestHandler):
     self.response.out.write(template.render(path, {}))
 
 
-#     **************
-class ChannelHandler(webapp.RequestHandler):
-#     **************
+class ChannelHandler(EntityRequestHandler):
   """Handles an individual channel resource
   e.g. /channel/123/
   Shows when it was created, and a link to subscribers (if there are any)
   """
-  def _getchannel(self, channelid):
-    # TODO refactor this into a base class
-    channel = Channel.get_by_id(int(channelid))
-    if channel is None:
-      self.response.out.write("Channel %s not found" % (channelid, ))
-      self.response.set_status(404)
-    return channel
-    
   def get(self, channelid):
-    channel = self._getchannel(channelid)
+    channel = self._getentity(Channel, channelid)
     if channel is None: return
 
     anysubscribers = Subscriber.all().filter('channel =', channel).fetch(1)
@@ -137,7 +146,7 @@ class ChannelHandler(webapp.RequestHandler):
 
   # The publish bit!
   def post(self, channelid):
-    channel = self._getchannel(channelid)
+    channel = self._getentity(Channel, channelid)
     if channel is None: return
 
     # Save message
@@ -148,27 +157,32 @@ class ChannelHandler(webapp.RequestHandler):
     )
     message.put()
 
-    for subscriber in Subscriber.all().filter('channel =', channel):
+#   for subscriber in Subscriber.all().filter('channel =', channel):
+    subscribers = Subscriber.all().filter('channel =', channel)
+    if subscribers.count():
+      for subscriber in subscribers:
+  
+        # Set up delivery of message to subscriber
+        delivery = Delivery(
+          message = message,
+          recipient = subscriber,
+        )
+        delivery.put()
+  
+      # Kick off a task to distribute message
+      taskqueue.Task(
+        url='/distributor/' + str(message.key())
+      ).add(QUEUE_DISTRIBUTION)
 
-      # Set up delivery of message to subscriber
-      delivery = Delivery(
-        message = message,
-        recipient = subscriber,
-      )
-      delivery.put()
-
-    # Kick off a task to distribute message
-    taskqueue.Task(
-      url='/distributor/' + str(message.key())
-    ).add(QUEUE_DISTRIBUTION)
+      logging.info("Delivery queued for %d subscribers of channel %s" % (subscribers.count(), channelid))
+    else:
+      logging.info("No subscribers for channel %s" % (channelid, ))
 
     # TODO should we return a 202 instead of a 302?
     self.redirect(self.request.url + 'message/' + str(message.key()))
 
 
-#     **************************************
 class ChannelSubscriberSubmissionformHandler(webapp.RequestHandler):
-#     **************************************
   """Handles the subscriber submission form for a given channel,
   i.e. resource /channel/{id}/subscriber/submissionform
   """
@@ -189,9 +203,7 @@ class ChannelSubscriberSubmissionformHandler(webapp.RequestHandler):
     self.response.out.write(template.render(path, template_values))
 
 
-#     *********************************
 class ChannelSubscriberContainerHandler(webapp.RequestHandler):
-#     *********************************
   """Handles the subscribers for a given channel, i.e. resource
   /channel/{id}/subscriber/
   """
@@ -253,24 +265,17 @@ class ChannelSubscriberContainerHandler(webapp.RequestHandler):
       self.response.set_status(201)
 
 
-#     ************************
-class ChannelSubscriberHandler(webapp.RequestHandler):
-#     ************************
+class ChannelSubscriberHandler(EntityRequestHandler):
   """Handles a given channel subscriber, i.e. resource
   /channel/{id}/subscriber/{id}/
   """
-  def get(self, channelid, subscriberid):
-    channel = Channel.get_by_id(int(channelid))
-    if channel is None:
-      self.response.out.write("Channel %s not found" % (channelid, ))
-      self.response.set_status(404)
-      return
 
-    subscriber = Subscriber.get_by_id(int(subscriberid))
-    if subscriber is None:
-      self.response.out.write("Subscriber %s for channel %s not found" % (subscriberid, channelid))
-      self.response.set_status(404)
-      return
+  def get(self, channelid, subscriberid):
+    channel = self._getentity(Channel, channelid)
+    if channel is None: return
+
+    subscriber = self._getentity(Subscriber, subscriberid)
+    if subscriber is None: return
 
     template_values = {
       'channel': channel,
@@ -279,10 +284,26 @@ class ChannelSubscriberHandler(webapp.RequestHandler):
     path = os.path.join(os.path.dirname(__file__), 'subscriber_detail.html')
     self.response.out.write(template.render(path, template_values))
 
+  def delete(self, channelid, subscriberid):
+    channel = self._getentity(Channel, channelid)
+    if channel is None: return
 
-#     **************************
+    subscriber = self._getentity(Subscriber, subscriberid)
+    if subscriber is None: return
+
+    def txn():
+#      # Must remove any deliveries relating to the subscriber?
+#      deliveries = Delivery.all().filter('recipient =', subscriber)
+#      db.delete(deliveries)
+      # Now delete the subscriber
+      subscriber.delete()
+    
+    db.run_in_transaction(txn)
+    self.response.out.write("Subscriber %s for channel %s deleted" % (subscriberid, channelid))
+
+    
+
 class SubscriberContainerHandler(webapp.RequestHandler):
-#     **************************
   """Handles the subscriber container resource, i.e.
   /subscriber/
   GET will just return a list of subscribers, by channel
@@ -314,23 +335,14 @@ class ChannelMessageHandler(webapp.RequestHandler):
     }
     path = os.path.join(os.path.dirname(__file__), 'messagedetail.html')
     self.response.out.write(template.render(path, template_values))
-    self.response.set_status(200)
 
 
-class ChannelMessageContainerHandler(webapp.RequestHandler):
+class ChannelMessageContainerHandler(EntityRequestHandler):
   """Handles the message container resource for a channel, in the form of
   /channel/{cid}/message/
   """
-  def _getchannel(self, channelid):
-    # TODO refactor this into a base class
-    channel = Channel.get_by_id(int(channelid))
-    if channel is None:
-      self.response.out.write("Channel %s not found" % (channelid, ))
-      self.response.set_status(404)
-    return channel
-    
   def get(self, channelid):
-    channel = self._getchannel(channelid)
+    channel = self._getentity(Channel, channelid)
     if channel is None: return
 
     template_values = {
@@ -339,23 +351,14 @@ class ChannelMessageContainerHandler(webapp.RequestHandler):
     }
     path = os.path.join(os.path.dirname(__file__), 'messagelist.html')
     self.response.out.write(template.render(path, template_values))
-    self.response.set_status(200)
 
 
-class ChannelMessageSubmissionformHandler(webapp.RequestHandler):
+class ChannelMessageSubmissionformHandler(EntityRequestHandler):
   """Handles the channel message submission form for a given channel,
   i.e. resource /channel/{id}/message/submissionform
   """
-  def _getchannel(self, channelid):
-    # TODO refactor this into a base class
-    channel = Channel.get_by_id(int(channelid))
-    if channel is None:
-      self.response.out.write("Channel %s not found" % (channelid, ))
-      self.response.set_status(404)
-    return channel
-    
   def get(self, channelid):
-    channel = self._getchannel(channelid)
+    channel = self._getentity(Channel, channelid)
     if channel is None: return
 
     template_values = {
@@ -375,7 +378,7 @@ class MessageHandler(webapp.RequestHandler):
   def get(self):
     # This seems expensive. TODO: refactor
     messages = []
-    for message in db.GqlQuery("SELECT * FROM Message ORDER BY channel ASC, created DESC"):
+    for message in db.GqlQuery("SELECT * FROM Message ORDER BY created DESC"):
       recipients = Delivery.all().filter('message =', message).count()
       delivered = Delivery.all().filter('message =', message).filter('status =', STATUS_DELIVERED).count()
       messages.append({
@@ -391,7 +394,7 @@ class MessageHandler(webapp.RequestHandler):
     
 
 
-class DistributeWorker(webapp.RequestHandler):
+class DistributorWorker(webapp.RequestHandler):
   """Task Queue worker - distributes a given message. The task queue 
   mechanism may retry this if not all the deliveries have been made.
   It should keep retrying until they all have been made.
@@ -399,7 +402,7 @@ class DistributeWorker(webapp.RequestHandler):
   def post(self, messageid):
     # Retrieve the message, make sure it exists
     message = Message.get(messageid)
-    if message is None: self.request.set_status(404)
+    if message is None: self.response.set_status(404)
 
     # Assume all deliveries are successful (i.e. this task is done)
     deliveriessucceeded = True
@@ -411,18 +414,22 @@ class DistributeWorker(webapp.RequestHandler):
 
       # Make the delivery with a POST to the recipient's resource
       # sending the published body, with the published body's content-type
-      result = urlfetch.fetch(
-        url = delivery.recipient.resource,
-        payload = message.body,
-        method = urlfetch.POST,
-        headers = { 'Content-Type': message.contenttype },
-      )
-      logging.info("Result is %s" % (result.status_code, ))
+      status = 999
+      try:
+        result = urlfetch.fetch(
+          url = delivery.recipient.resource,
+          payload = message.body,
+          method = urlfetch.POST,
+          headers = { 'Content-Type': message.contenttype },
+        )
+        status = result.status_code
+      except: 
+        logging.error("urlfetch encountered an EXCEPTION")
 
       # If we've had a successful status then consider this 
       # particular delivery done. Otherwise, mark the delivery
       # as failed.
-      if result.status_code < 400:
+      if status < 400:
         delivery.status = STATUS_DELIVERED
         delivery.put()
       else:
@@ -448,7 +455,7 @@ def main():
     (r'/channel/?', ChannelContainerHandler),
     (r'/subscriber/', SubscriberContainerHandler),
     (r'/message/', MessageHandler),
-    (r'/distributor/(.+?)', DistributeWorker),
+    (r'/distributor/(.+?)', DistributorWorker),
   ], debug=True)
   wsgiref.handlers.CGIHandler().run(application)
 

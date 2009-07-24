@@ -12,7 +12,7 @@
     {% for subscriber in subscribers %}
       <tr>
         <td><a href='/channel/{{ subscriber.channel.key.id }}/subscriber/{{ subscriber.key.id }}/'>{{ subscriber.name }}</a></td>
-        <td><a href='{{ subscriber.resource }}/'>{{ subscriber.resource }}</a></td>
+        <td><a href='{{ subscriber.resource }}'>{{ subscriber.resource }}</a></td>
         <td><a href='/channel/{{ subscriber.channel.key.id }}/'>{{ subscriber.channel.name }}</a></td>
       </tr>
     {% endfor %}

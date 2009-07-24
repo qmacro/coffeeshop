@@ -4,7 +4,7 @@
     {% include 'title_incl.html' %}
     {% include 'channel_incl.html' %}
     {% include 'subscriber_incl.html' %}
-    <p>Resource: {{ subscriber.resource }}</p>
+    <p>Resource: <a href='{{ subscriber.resource }}'>{{ subscriber.resource }}</a></p>
     <p>Created: {{ subscriber.created }}</p>
   </body>
 </html>

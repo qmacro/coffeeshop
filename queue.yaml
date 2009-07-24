@@ -2,4 +2,4 @@ queue:
 - name: default
   rate: 1/s
 - name: msgdist
-  rate: 5/s
+  rate: 2/s
