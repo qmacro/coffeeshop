@@ -41,6 +41,9 @@ def isNumber(n):
 
 
 class EntityRequestHandler(webapp.RequestHandler):
+  """Base RequestHandler supplying common methods
+  for retrieving entities such as channels and subscribers
+  """
   def _getentity(self, type, id):
     entity = None
 
@@ -174,9 +177,9 @@ class ChannelHandler(EntityRequestHandler):
         url='/distributor/' + str(message.key())
       ).add(QUEUE_DISTRIBUTION)
 
-      logging.info("Delivery queued for %d subscribers of channel %s" % (subscribers.count(), channelid))
+      logging.debug("Delivery queued for %d subscribers of channel %s" % (subscribers.count(), channelid))
     else:
-      logging.info("No subscribers for channel %s" % (channelid, ))
+      logging.debug("No subscribers for channel %s" % (channelid, ))
 
     # TODO should we return a 202 instead of a 302?
     self.redirect(self.request.url + 'message/' + str(message.key()))
@@ -402,7 +405,10 @@ class DistributorWorker(webapp.RequestHandler):
   def post(self, messageid):
     # Retrieve the message, make sure it exists
     message = Message.get(messageid)
-    if message is None: self.response.set_status(404)
+    if message is None:
+       logging.debug("Message %s does not exist, returning 200" % (messageid, ))
+       self.response.set_status(200)
+       return
 
     # Assume all deliveries are successful (i.e. this task is done)
     deliveriessucceeded = True
@@ -410,7 +416,7 @@ class DistributorWorker(webapp.RequestHandler):
     # For this message, process those deliveries that have not yet been
     # delivered (status will be None)
     for delivery in Delivery.all().filter('message =', message).filter('status =', None):
-      logging.info("Processing delivery %s" % (delivery.key(), ))
+      logging.debug("Processing delivery %s" % (delivery.key(), ))
 
       # Make the delivery with a POST to the recipient's resource
       # sending the published body, with the published body's content-type

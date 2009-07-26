@@ -1,5 +1,5 @@
 #!/bin/sh
 
-HUBROOT=http://giant:8888
+HUBROOT=http://qmacro-coffeeshop.appspot.com
 SUBROOT=http://qmacro.appspot.com/subscriber
 
