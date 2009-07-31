@@ -53,6 +53,12 @@ class EntityRequestHandler(webapp.RequestHandler):
       self.response.set_status(404)
       return
 
+    id = int(id)
+    if id == 0:
+      self.response.out.write("%s cannot be zero (got %s)" % (type.__name__, id))
+      self.response.set_status(404)
+      return
+
     entity = type.get_by_id(int(id))
     if entity is None:
       self.response.out.write("%s %s not found" % (type.__name__, id))

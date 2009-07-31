@@ -1,3 +1,6 @@
+_*
+*.rtf
+Thumbs.db
 *.swp
 *.pyc
 index.yaml
