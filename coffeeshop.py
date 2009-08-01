@@ -188,7 +188,10 @@ class ChannelHandler(EntityRequestHandler):
       logging.debug("No subscribers for channel %s" % (channelid, ))
 
     # TODO should we return a 202 instead of a 302?
-    self.redirect(self.request.url + 'message/' + str(message.key()))
+    # Actually I think it's just a 201, as we've created a new (message) resource
+#   self.redirect(self.request.url + 'message/' + str(message.key()))
+    self.response.headers['Location'] = self.request.path + "message/%s" % str(message.key())
+    self.response.set_status(201)
 
 
 class ChannelSubscriberSubmissionformHandler(webapp.RequestHandler):
