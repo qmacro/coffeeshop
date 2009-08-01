@@ -158,7 +158,7 @@ class ChannelTests(unittest.TestCase):
     getres = self.conn.getresponse()
     self.assertTrue(re.search('No subscribers', getres.read()))
 
-    # Delete the channel
+    # Delete the channel, expect 204
     self.conn.request("DELETE", location)
     deleteres = self.conn.getresponse()
     self.assertEquals(deleteres.status, 204)
@@ -180,9 +180,7 @@ class ChannelTests(unittest.TestCase):
     self.conn.request("DELETE", location)
     deleteres = self.conn.getresponse()
     self.assertEquals(deleteres.status, 405)
-    log("got %s" % deleteres.getheaders())
-    self.failIf(deleteres.getheader('Location') is None)
-
+    self.failIf(deleteres.getheader('Allow') is None)
 
     
 class SubscriberTests(unittest.TestCase):
@@ -259,6 +257,45 @@ class SubscriberTests(unittest.TestCase):
     s2status, s2location, s2id = newSubscriber(self.conn, cid, "%s 2" % myfuncname(), 
       "http://%s/subscriber/%s" % (SUBROOT, myfuncname()))
     self.assertEqual(s2status, 201)
+
+  def testSubscriberNoDeliveriesDelete(self):
+    """A subscriber with no deliveries outstanding may be deleted"""
+
+    # Create the channel first
+    cstatus, clocation, cid = newChannel(self.conn, myfuncname())
+
+    # Create the subscriber
+    sstatus, slocation, sid = newSubscriber(self.conn, cid, myfuncname(), 
+      "http://%s/subscriber/%s" % (SUBROOT, myfuncname()))
+
+    # Try to delete the subscriber, expect 204
+    self.conn.request("DELETE", slocation)
+    deleteres = self.conn.getresponse()
+    self.assertEquals(deleteres.status, 204)
+
+
+  def testSubscriberWithDeliveriesNoDelete(self):
+    """A subscriber with deliveries outstanding may not be deleted"""
+
+    # Create the channel first
+    cstatus, clocation, cid = newChannel(self.conn, myfuncname())
+
+    # Create the subscriber with an undeliverable resource
+    # (If we're running these tests on the SDK development server,
+    # the deliveries won't be started automatically anyway, so will
+    # remain outstanding)
+    sstatus, slocation, sid = newSubscriber(self.conn, cid, myfuncname(), 
+      "http://bad.coffeeshop.subscriber")
+    self.assertEqual(sstatus, 201)
+
+    # Publish a message
+    mstatus, mlocation, mid = newMessage(self.conn, cid, myfuncname())
+
+    # Try to delete the subscriber, expect 405 + Allow header
+    self.conn.request("DELETE", slocation)
+    deleteres = self.conn.getresponse()
+    self.assertEquals(deleteres.status, 405)
+    self.failIf(deleteres.getheader('Allow') is None)
 
 
 class MessageTests(unittest.TestCase):

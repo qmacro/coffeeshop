@@ -5,7 +5,7 @@
     {% include 'channel_incl.html' %}
     <h2>Publish a test message</h2>
     <form action="/channel/{{ channel.key.id }}/" method="POST">
-      <input type="hidden" name="messagesubmissionform" value="1" />
+      <input type="hidden" name="messagesubmissionform" value="coffeeshop" />
       <div><label>Message:<input type="text" name="message" /></label></div>
       <div><input type="submit" value="Submit"/></div>
     </form>

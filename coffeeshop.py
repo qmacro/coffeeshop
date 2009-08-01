@@ -140,6 +140,7 @@ class ChannelHandler(EntityRequestHandler):
   Shows when it was created, and a link to subscribers (if there are any)
   """
   def get(self, channelid):
+    """Return general information on the channel"""
     channel = self._getentity(Channel, channelid)
     if channel is None: return
 
@@ -152,15 +153,17 @@ class ChannelHandler(EntityRequestHandler):
     path = os.path.join(os.path.dirname(__file__), 'channel_detail.html')
     self.response.out.write(template.render(path, template_values))
 
-
   # The publish bit!
   def post(self, channelid):
+    """Handles a message publish to this channel"""
     channel = self._getentity(Channel, channelid)
     if channel is None: return
 
+    contenttype = self.request.headers['Content-Type']
+
     # Save message
     message = Message(
-      contenttype = self.request.headers['Content-Type'],
+      contenttype = contenttype,
       body = self.request.body,
       channel = channel,
     )
@@ -190,8 +193,28 @@ class ChannelHandler(EntityRequestHandler):
     # TODO should we return a 202 instead of a 302?
     # Actually I think it's just a 201, as we've created a new (message) resource
 #   self.redirect(self.request.url + 'message/' + str(message.key()))
+
+    # Try to detect whether we're from the coffeeshop browser, and if so, return a 302
     self.response.headers['Location'] = self.request.path + "message/%s" % str(message.key())
-    self.response.set_status(201)
+    if contenttype == "application/x-www-form-urlencoded" and self.request.get('messagesubmissionform') == "coffeeshop":
+      self.response.set_status(302)
+    else:
+      self.response.set_status(201)
+
+  def delete(self, channelid):
+    """Handle deletion of a channel. Only allow if there are no subscribers"""
+    channel = self._getentity(Channel, channelid)
+    if channel is None: return
+
+    # Check the subscribers
+    nrsubscribers = Subscriber.all().filter('channel =', channel).count()
+    if nrsubscribers:
+      # Can't delete if subscribers still exist
+      self.response.set_status(405, "CANNOT DELETE - %s SUBSCRIBERS" % nrsubscribers)
+      self.response.headers['Allow'] = "GET, POST"
+    else:
+      channel.delete()
+      self.response.set_status(204)
 
 
 class ChannelSubscriberSubmissionformHandler(webapp.RequestHandler):
@@ -297,23 +320,24 @@ class ChannelSubscriberHandler(EntityRequestHandler):
     self.response.out.write(template.render(path, template_values))
 
   def delete(self, channelid, subscriberid):
+    """Handle deletion of a subscribers.
+    Only allow if there are no outstanding deliveries."""
+
     channel = self._getentity(Channel, channelid)
     if channel is None: return
 
     subscriber = self._getentity(Subscriber, subscriberid)
     if subscriber is None: return
 
-    def txn():
-#      # Must remove any deliveries relating to the subscriber?
-#      deliveries = Delivery.all().filter('recipient =', subscriber)
-#      db.delete(deliveries)
-      # Now delete the subscriber
+    nrdeliveries = Delivery.all().filter('recipient =', subscriber).filter('status !=', STATUS_DELIVERED).count()
+    if nrdeliveries:
+      # Can't delete if deliveries still outstanding
+      self.response.set_status(405, "CANNOT DELETE - %s DELIVERIES OUTSTANDING" % nrdeliveries)
+      self.response.headers['Allow'] = "GET"
+    else:
       subscriber.delete()
-    
-    db.run_in_transaction(txn)
-    self.response.out.write("Subscriber %s for channel %s deleted" % (subscriberid, channelid))
+      self.response.set_status(204)
 
-    
 
 class SubscriberContainerHandler(webapp.RequestHandler):
   """Handles the subscriber container resource, i.e.
