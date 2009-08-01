@@ -1,6 +1,7 @@
 _*
-*.rtf
 Thumbs.db
+index.yaml
 *.swp
 *.pyc
-index.yaml
+*.log
+*.rtf
