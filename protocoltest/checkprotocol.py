@@ -60,6 +60,7 @@ def newMessage(conn, cid, message="the message"):
   data = message
   conn.request("POST", "/channel/%s/" % cid, data)
   res = conn.getresponse()
+  log("created message for channel %s : %s" % (cid, res.status), 2)
   if res.status == 201:
     location = res.getheader('Location')
     idsearch = re.search(MESSAGE, location)
@@ -79,6 +80,9 @@ class BasicTests(unittest.TestCase):
 
   def testStartPageExists(self):
     """Check the start page exists"""
+
+    # GET /
+
     self.conn.request("GET", "/")
     res = self.conn.getresponse()
     self.assertEqual(res.status, 200)
@@ -94,17 +98,26 @@ class ChannelTests(unittest.TestCase):
 
   def testChannelContainerExists(self):
     """The channel container page exists"""
+
+    # GET /channel/
+
     self.conn.request("GET", "/channel/")
     res = self.conn.getresponse()
     self.assertEqual(res.status, 200)
 
   def testChannelCreationStatus(self):
     """A channel can be created"""
+
+    # POST /channel/
+
     status, location, cid = newChannel(self.conn, myfuncname())
     self.assertEqual(status, 201)
     
   def testDuplicateChannelName(self):
     """A name can be used for more than one channel"""
+
+    # POST /channel/
+
     status, location, cid = newChannel(self.conn, myfuncname())
     self.assertEqual(status, 201)
     status, location, cid = newChannel(self.conn, myfuncname())
@@ -112,11 +125,17 @@ class ChannelTests(unittest.TestCase):
     
   def testChannelCreationLocation(self):
     """A valid Location is returned for a created channel"""
+
+    # POST /channel/
+
     status, location, cid = newChannel(self.conn, myfuncname())
     self.assertTrue(re.search(CHANNEL, location))
 
   def testChannelInfo(self):
     """There is channel info available"""
+
+    # GET /channel/{cid}/
+
     # Create the channel first
     status, location, cid = newChannel(self.conn, myfuncname())
 
@@ -130,24 +149,35 @@ class ChannelTests(unittest.TestCase):
 
   def testInvalidChannelId(self):
     """Get 404 when the channel id is non-numeric"""
+
+    # GET /channel/{cid}/
+
     self.conn.request("GET", "/channel/nonnumeric/")
     res = self.conn.getresponse()
     self.assertEqual(res.status, 404)
 
   def testChannelNotFound(self):
     """404 is returned for non-existent channel"""
+
+    # GET /channel/{cid}/
+
     self.conn.request("GET", "/channel/9999999/")
     res = self.conn.getresponse()
     self.assertEqual(res.status, 404)
 
   def testZeroChannelNotFound(self):
     """404 is returned for channel zero"""
+
+    # GET /channel/{cid}/
+
     self.conn.request("GET", "/channel/0/")
     res = self.conn.getresponse()
     self.assertEqual(res.status, 404)
 
   def testChannelNoSubsDelete(self):
     """A channel without subscribers can be deleted"""
+
+    # DELETE /channel/{cid}/
 
     # Create a channel
     status, location, cid = newChannel(self.conn, myfuncname())
@@ -163,9 +193,10 @@ class ChannelTests(unittest.TestCase):
     deleteres = self.conn.getresponse()
     self.assertEquals(deleteres.status, 204)
 
-
   def testChannelWithSubsNoDelete(self):
     """A channel with subscribers cannot be deleted"""
+
+    # DELETE /channel/{cid}/
 
     # Create a channel
     status, location, cid = newChannel(self.conn, myfuncname())
@@ -193,6 +224,9 @@ class SubscriberTests(unittest.TestCase):
 
   def testSubscriberContainerResourceExists(self):
     """A subscriber container resource exists for a channel"""
+
+    # GET /channel/{cid}/subscriber/
+
     # Create the channel first
     status, location, cid = newChannel(self.conn, myfuncname())
 
@@ -204,6 +238,8 @@ class SubscriberTests(unittest.TestCase):
 
   def testSubscriberCreationStatus(self):
     """A subscriber can be created and returns status 201"""
+
+    # POST /channel/{cid}/subscriber/
 
     # Create the channel first
     cstatus, clocation, cid = newChannel(self.conn, myfuncname())
@@ -217,6 +253,8 @@ class SubscriberTests(unittest.TestCase):
   def testSubscriberCreationLocation(self):
     """A subscriber can be created and a valid Location is returned"""
 
+    # POST /channel/{cid}/subscriber/
+
     # Create the channel first
     cstatus, clocation, cid = newChannel(self.conn, myfuncname())
 
@@ -228,6 +266,8 @@ class SubscriberTests(unittest.TestCase):
 
   def testDuplicateSubscriberName(self):
     """A channel can have multiple subscribers with the same name"""
+
+    # POST /channel/{cid}/subscriber/
 
     # Create the channel first
     cstatus, clocation, cid = newChannel(self.conn, myfuncname())
@@ -245,6 +285,8 @@ class SubscriberTests(unittest.TestCase):
   def testDuplicateSubscriberResource(self):
     """A channel can have multiple subscribers with the same resource"""
 
+    # POST /channel/{cid}/subscriber/
+
     # Create the channel first
     cstatus, clocation, cid = newChannel(self.conn, myfuncname())
 
@@ -258,8 +300,31 @@ class SubscriberTests(unittest.TestCase):
       "http://%s/subscriber/%s" % (SUBROOT, myfuncname()))
     self.assertEqual(s2status, 201)
 
+  def testSubscriberInfo(self):
+    """A subscriber's info can be retrieved"""
+
+    # GET /channel/{cid}/subscriber/{sid}/
+
+    # Create the channel first
+    cstatus, clocation, cid = newChannel(self.conn, myfuncname())
+
+    # Create a subscriber
+    sstatus, slocation, sid = newSubscriber(self.conn, cid, "%s 1" % myfuncname(), 
+      "http://%s/subscriber/%s" % (SUBROOT, myfuncname()))
+    self.assertEqual(sstatus, 201)
+
+    # Retrieve the subscriber info page
+    self.conn.request("GET", slocation)
+    res = self.conn.getresponse()
+
+    # We're looking for a 200, and "Created"
+    self.assertEqual(res.status, 200)
+    self.assertTrue(re.search('Created', res.read()))
+
   def testSubscriberNoDeliveriesDelete(self):
     """A subscriber with no deliveries outstanding may be deleted"""
+
+    # DELETE /channel/{cid}/subscriber/{sid}/
 
     # Create the channel first
     cstatus, clocation, cid = newChannel(self.conn, myfuncname())
@@ -276,6 +341,8 @@ class SubscriberTests(unittest.TestCase):
 
   def testSubscriberWithDeliveriesNoDelete(self):
     """A subscriber with deliveries outstanding may not be deleted"""
+
+    # DELETE /channel/{cid}/subscriber/{sid}/
 
     # Create the channel first
     cstatus, clocation, cid = newChannel(self.conn, myfuncname())
@@ -323,9 +390,78 @@ class MessageTests(unittest.TestCase):
     status, location, mid = newMessage(self.conn, 99999, myfuncname())
     self.assertEqual(status, 404)
 
+  def testMessageCreationStatus(self):
+    """A message can be published to a channel and gives a 201"""
+    # Create the channel first
+    cstatus, clocation, cid = newChannel(self.conn, myfuncname())
+    self.assertTrue(re.search(CHANNEL, clocation))
 
+    # Create the subscriber
+    sstatus, slocation, sid = newSubscriber(self.conn, cid, myfuncname(), 
+      "http://%s/subscriber/%s" % (SUBROOT, myfuncname()))
+    self.assertEqual(sstatus, 201)
 
+    # Publish a message
+    mstatus, mlocation, mid = newMessage(self.conn, cid, myfuncname())
 
+    # Check status is 201
+    self.assertEqual(mstatus, 201)
+
+  def testMessageCreationLocation(self):
+    """A message can be published to a channel and gets a Location"""
+    # Create the channel first
+    cstatus, clocation, cid = newChannel(self.conn, myfuncname())
+    self.assertTrue(re.search(CHANNEL, clocation))
+
+    # Create the subscriber
+    sstatus, slocation, sid = newSubscriber(self.conn, cid, myfuncname(), 
+      "http://%s/subscriber/%s" % (SUBROOT, myfuncname()))
+    self.assertEqual(sstatus, 201)
+
+    # Publish a message
+    mstatus, mlocation, mid = newMessage(self.conn, cid, myfuncname())
+
+    # Check Location header exists
+    self.assertTrue(re.search(MESSAGE, mlocation))
+
+  def testMessageInfo(self):
+    """A created message has an info page"""
+    # Create the channel first
+    cstatus, clocation, cid = newChannel(self.conn, myfuncname())
+    self.assertTrue(re.search(CHANNEL, clocation))
+
+    # Create the subscriber
+    sstatus, slocation, sid = newSubscriber(self.conn, cid, myfuncname(), 
+      "http://%s/subscriber/%s" % (SUBROOT, myfuncname()))
+    self.assertEqual(sstatus, 201)
+
+    # Publish a message
+    mstatus, mlocation, mid = newMessage(self.conn, cid, myfuncname())
+
+    # Retrieve the message info page
+    self.conn.request("GET", mlocation)
+    res = self.conn.getresponse()
+
+    # We're looking for a 200, and "Created"
+    self.assertEqual(res.status, 200)
+    self.assertTrue(re.search('Created', res.read()))
+
+  def testCreateMultipleMessages(self):
+    """Multiple messages can be created for a channel"""
+    # Create the channel first
+    cstatus, clocation, cid = newChannel(self.conn, myfuncname())
+    self.assertTrue(re.search(CHANNEL, clocation))
+
+    # Create the subscriber
+    sstatus, slocation, sid = newSubscriber(self.conn, cid, myfuncname(), 
+      "http://%s/subscriber/%s" % (SUBROOT, myfuncname()))
+    self.assertEqual(sstatus, 201)
+
+    # Publish messages; check status and location for each
+    for m in range(50):
+      mstatus, mlocation, mid = newMessage(self.conn, cid, myfuncname())
+      self.assertTrue(re.search(MESSAGE, mlocation))
+      self.assertEqual(mstatus, 201)
 
 
 if __name__ == '__main__':

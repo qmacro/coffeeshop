@@ -460,6 +460,7 @@ class DistributorWorker(webapp.RequestHandler):
           payload = message.body,
           method = urlfetch.POST,
           headers = { 'Content-Type': message.contenttype },
+          follow_redirects = False,
         )
         status = result.status_code
       except: 
