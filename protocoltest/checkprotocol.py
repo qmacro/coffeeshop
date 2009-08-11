@@ -4,18 +4,18 @@ import unittest
 import httplib, urllib, re
 import logging, sys
 
-HUBROOT = 'giant:8888'
-SUBROOT = 'giant:8889'
+HUBROOT = 'giant:8082'
+SUBROOT = 'giant:8085'
 LOGFILE = 'unittest.log'
 SUBSCRIBER_CONTAINER = 'subscriber/'
 MESSAGE_CONTAINER = 'message/'
 
 logger = None
 
-# Relative resource patterns
-CHANNEL = r'^\/channel\/(\d+)\/$'
-SUBSCRIBER = r'^\/channel\/\d+\/subscriber\/(\d+)\/$'
-MESSAGE = r'^\/channel\/\d+\/message\/(\w+)$'
+# Resource patterns
+CHANNEL = r'^https?:\/\/[^\/]+\/channel\/(\d+)\/$'
+SUBSCRIBER = r'^https?:\/\/[^\/]+\/channel\/\d+\/subscriber\/(\d+)\/$'
+MESSAGE = r'^https?:\/\/[^\/]+\/channel\/\d+\/message\/(\w+)$'
 
 # Helper functions
 def myfuncname():

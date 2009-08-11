@@ -118,7 +118,7 @@ class ChannelContainerHandler(webapp.RequestHandler):
     if self.request.get('channelsubmissionform'):
       self.redirect('/channel/')
     else:
-      self.response.headers['Location'] = '/channel/' + str(channel.key().id()) + '/'
+      self.response.headers['Location'] = self.request.url + str(channel.key().id()) + '/'
       self.response.set_status(201)
 
 
@@ -195,7 +195,7 @@ class ChannelHandler(EntityRequestHandler):
 #   self.redirect(self.request.url + 'message/' + str(message.key()))
 
     # Try to detect whether we're from the coffeeshop browser, and if so, return a 302
-    self.response.headers['Location'] = self.request.path + "message/%s" % str(message.key())
+    self.response.headers['Location'] = self.request.url + "message/%s" % str(message.key())
     if contenttype == "application/x-www-form-urlencoded" and self.request.get('messagesubmissionform') == "coffeeshop":
       self.response.set_status(302)
     else:
@@ -296,7 +296,7 @@ class ChannelSubscriberContainerHandler(webapp.RequestHandler):
     if self.request.get('subscribersubmissionform'):
       self.redirect(self.request.path_info)
     else:
-      self.response.headers['Location'] = '/channel/' + channelid + '/subscriber/' + str(subscriber.key().id()) + '/'
+      self.response.headers['Location'] = self.request.url + str(subscriber.key().id()) + '/'
       self.response.set_status(201)
 
 
