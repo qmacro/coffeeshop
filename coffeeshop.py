@@ -19,6 +19,7 @@ from google.appengine.ext import webapp
 from google.appengine.ext import db
 from google.appengine.api.labs import taskqueue
 from google.appengine.api import urlfetch
+from django.utils import simplejson
 
 VERSION = "0.01"
 DEBUG = True
@@ -28,6 +29,8 @@ QUEUE_DISTRIBUTION='msgdist'
 
 # Statuses
 STATUS_DELIVERED='DELIVERED'
+
+CT_JSON = 'application/json'
 
 if DEBUG:
   logging.getLogger().setLevel(logging.DEBUG)
@@ -365,9 +368,38 @@ class ChannelMessageHandler(webapp.RequestHandler):
       self.response.set_status(404)
       return
 
+    deliveries = Delivery.all().filter('message =', message)
+
+    channelurl = "%s://%s/channel/%d/" % (self.request.scheme, self.request.host, message.channel.key().id())
+
+    # Poor conneg
+    if (self.request.headers.has_key('Accept')
+      and self.request.headers['Accept'] == CT_JSON):
+      logging.info("JSON requested")
+      deliveryinfo = []
+      for d in deliveries:
+        deliveryinfo.append({
+          'recipient': "%ssubscriber/%d/" % (channelurl, d.recipient.key().id()),
+          'status': d.status,
+          'timestamp': d.updated.strftime("%Y-%m-%dT%H:%M:%SZ"),
+      })
+      info = {
+        'message': {
+          'resource': "%smessage/%s" % (channelurl, str(message.key())),
+          'key': str(message.key()),
+          'created': message.created.strftime("%Y-%m-%dT%H:%M:%SZ"),
+          'channel': channelurl,
+          'delivery': deliveryinfo,
+        },
+      }
+      self.response.out.write(simplejson.dumps(info))
+      self.response.headers['Content-Type'] = CT_JSON
+      return
+
     template_values = {
       'message': message,
-      'deliveries': Delivery.all().filter('message =', message),
+      #'deliveries': Delivery.all().filter('message =', message),
+      'deliveries': deliveries,
     }
     path = os.path.join(os.path.dirname(__file__), 'messagedetail.html')
     self.response.out.write(template.render(path, template_values))

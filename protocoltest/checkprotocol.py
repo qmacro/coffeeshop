@@ -4,11 +4,17 @@ import unittest
 import httplib, urllib, re
 import logging, sys
 
+APPENGINE = '/home/dj/dev/google_appengine_1.2.3/'
 HUBROOT = 'giant:8082'
 SUBROOT = 'giant:8085'
 LOGFILE = 'unittest.log'
 SUBSCRIBER_CONTAINER = 'subscriber/'
 MESSAGE_CONTAINER = 'message/'
+
+sys.path.append(APPENGINE + "lib/django/")
+print sys.path
+from django.utils import simplejson
+
 
 logger = None
 
@@ -446,6 +452,30 @@ class MessageTests(unittest.TestCase):
     self.assertEqual(res.status, 200)
     self.assertTrue(re.search('Created', res.read()))
 
+  def testMessageInfoAsJson(self):
+    """A created message has info available as JSON if requested"""
+    # Create the channel first
+    cstatus, clocation, cid = newChannel(self.conn, myfuncname())
+    self.assertTrue(re.search(CHANNEL, clocation))
+
+    # Create the subscriber
+    sstatus, slocation, sid = newSubscriber(self.conn, cid, myfuncname(), 
+      "http://%s/subscriber/%s" % (SUBROOT, myfuncname()))
+    self.assertEqual(sstatus, 201)
+
+    # Publish a message
+    mstatus, mlocation, mid = newMessage(self.conn, cid, myfuncname())
+
+    # Retrieve the message info page
+    self.conn.request("GET", mlocation, "", {'Accept': 'application/json'})
+    res = self.conn.getresponse()
+
+    body = res.read()
+    log("JSON received: %s" % (body, ))
+    # We're looking for a 200, and "Created"
+    self.assertEqual(res.status, 200)
+    self.assertTrue(re.search('Created', body))
+
   def testCreateMultipleMessages(self):
     """Multiple messages can be created for a channel"""
     # Create the channel first
@@ -458,7 +488,7 @@ class MessageTests(unittest.TestCase):
     self.assertEqual(sstatus, 201)
 
     # Publish messages; check status and location for each
-    for m in range(50):
+    for m in range(5):
       mstatus, mlocation, mid = newMessage(self.conn, cid, myfuncname())
       self.assertTrue(re.search(MESSAGE, mlocation))
       self.assertEqual(mstatus, 201)
